@@ -1,0 +1,52 @@
+version: "3"
+
+services:
+  db13:
+    image: postgres:13
+    restart: always
+    network_mode: "host"
+    environment:
+      - POSTGRES_PASSWORD=odoo
+      - POSTGRES_USER=odoo
+      - POSTGRES_DB=odoo
+    volumes:
+      - "../db_data_odoo12_pg13/:/var/lib/postgresql/data"
+      - "../db_backup_odoo12/:/db_backup/"
+  db:
+    image: postgres:11
+    restart: always
+    network_mode: "host"
+    environment:
+      - POSTGRES_PASSWORD=odoo
+      - POSTGRES_USER=odoo
+      - POSTGRES_DB=odoo
+    volumes:
+      - "../db_data_odoo12/:/var/lib/postgresql/data"
+      - "../db_backup_odoo12/:/db_backup/"
+  web:
+    build: .
+    restart: always
+    volumes:
+      - ".:/src"
+      - "./storage:/root/.local/share/Odoo"
+    network_mode: "host"
+    depends_on:
+      - db
+  nginx:
+    image: nginx:1.17.0
+    restart: always
+    volumes:
+      - "./nginx/conf.d/:/etc/nginx/conf.d/"
+      - "./nginx/certbot/conf:/etc/letsencrypt"
+      - "./nginx/certbot/www:/var/www/certbot"
+      - ".:/src"
+    network_mode: "host"
+    command: "/bin/sh -c 'while :; do sleep 6h & wait $${!}; nginx -s reload; done & nginx -g \"daemon off;\"'"
+    depends_on:
+      - web
+  certbot:
+    image: certbot/certbot
+    volumes:
+      - "./nginx/certbot/conf:/etc/letsencrypt"
+      - "./nginx/certbot/www:/var/www/certbot"
+    entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew; sleep 12h & wait $${!}; done;'"
